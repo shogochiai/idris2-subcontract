@@ -155,3 +155,81 @@ SEL_OWNER = 0x8da5cb5b
 export
 SEL_TRANSFER : Integer
 SEL_TRANSFER = 0xf2fde38b
+
+||| initializeOwner(address) -> 0xc4d66de8
+export
+SEL_INITIALIZE : Integer
+SEL_INITIALIZE = 0xc4d66de8
+
+-- =============================================================================
+-- Entry Point Helpers
+-- =============================================================================
+
+%foreign "evm:mstore"
+prim__mstore : Integer -> Integer -> PrimIO ()
+
+dictMstore : Integer -> Integer -> IO ()
+dictMstore off val = primIO (prim__mstore off val)
+
+||| Extract function selector from calldata (first 4 bytes)
+export
+getSelector : IO Integer
+getSelector = do
+  data_ <- calldataload 0
+  -- Shift right 224 bits to get first 4 bytes
+  pure (data_ `div` 0x100000000000000000000000000000000000000000000000000000000)
+
+||| Return a uint256 value
+export
+returnUint : Integer -> IO ()
+returnUint val = do
+  dictMstore 0 val
+  evmReturn 0 32
+
+-- =============================================================================
+-- Entry Point
+-- =============================================================================
+
+||| Main entry point for Dictionary contract
+||| Dispatches to appropriate function based on selector
+export
+main : IO ()
+main = do
+  selector <- getSelector
+
+  if selector == SEL_GET_IMPL
+    then do
+      -- getImplementation(bytes4 selector)
+      arg <- calldataload 4
+      impl <- getImplementation arg
+      returnUint impl
+
+    else if selector == SEL_SET_IMPL
+    then do
+      -- setImplementation(bytes4 selector, address impl)
+      sel <- calldataload 4
+      impl <- calldataload 36
+      setImplementation sel impl
+      evmReturn 0 0
+
+    else if selector == SEL_OWNER
+    then do
+      -- owner()
+      owner <- getOwner
+      returnUint owner
+
+    else if selector == SEL_TRANSFER
+    then do
+      -- transferOwnership(address newOwner)
+      newOwner <- calldataload 4
+      transferOwnership newOwner
+      evmReturn 0 0
+
+    else if selector == SEL_INITIALIZE
+    then do
+      -- initializeOwner(address owner)
+      owner <- calldataload 4
+      initializeOwner owner
+      evmReturn 0 0
+
+    else evmRevert 0 0  -- Unknown function
