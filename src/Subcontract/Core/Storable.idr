@@ -24,7 +24,7 @@
 ||| ```
 module Subcontract.Core.Storable
 
-import Data.Vect
+import public Data.Vect
 import public EVM.Primitives
 
 %default total

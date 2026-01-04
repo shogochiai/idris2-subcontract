@@ -31,6 +31,9 @@ modules = Subcontract.Standards.ERC7546.Slots
         , Subcontract.Core.Reentrancy
         , Subcontract.Core.Call
         , Subcontract.Core.Gas
+        , Subcontract.Core.Effects
+        , Subcontract.Core.Epoch
+        , Subcontract.Core.LinearAsset
         , Subcontract.Core.ABI.Sig
         , Subcontract.Core.ABI.Decoder
         , Subcontract.Std.Functions.FeatureToggle

@@ -65,6 +65,9 @@ Subcontract/
 │   ├── Reentrancy.idr        # Lock types for reentrancy guard
 │   ├── Call.idr              # Type-safe external calls
 │   ├── Gas.idr               # Compile-time gas modeling
+│   ├── Effects.idr           # Effect-typed entries, CEI safety
+│   ├── Epoch.idr             # Epoch-indexed upgrades
+│   ├── LinearAsset.idr       # Linear-persistent assets
 │   └── ABI/
 │       ├── Sig.idr           # Function signatures
 │       └── Decoder.idr       # Calldata decoding
@@ -259,6 +262,55 @@ tx : BoundedTx ComplexTx
 tx = boundedTx ComplexTx computation gasSeq
 ```
 
+### Effect-Typed Entries (CEI Safety)
+
+```idris
+import Subcontract.Core.Effects
+
+-- Declare effects at type level
+transferEffects : EffectList
+transferEffects = [SLoad balanceSlot, SStore balanceSlot, Log 3]
+
+-- CEI safety proof required - unsafe patterns won't compile
+entry : {auto prf : CEISafe effs} -> EffectEntry effs
+
+-- Write-before-Call detected at COMPILE TIME
+unsafeEffects = [SStore slot, Call target]  -- Cannot get CEISafe proof!
+```
+
+### Epoch-Indexed Upgrades
+
+```idris
+import Subcontract.Core.Epoch
+
+-- Functions tagged with epoch
+myFunctionV1 : EpochFunction E0
+myFunctionV2 : EpochFunction E1  -- Different type!
+
+-- Migration with type-checked transformation
+migrate : EpochState E0 OldData -> EpochState E1 NewData
+
+-- Upgrade only allowed E0 -> E1 (no skipping)
+upgrade : EpochTransition E0 E1 -> ...
+```
+
+### Linear-Persistent Assets
+
+```idris
+import Subcontract.Core.LinearAsset
+
+-- SpendToken is LINEAR - use exactly once
+spend : AssetStorage -> SpendToken asset -> IO ()  -- Token consumed
+
+-- Double-spend impossible: token gone after first use
+vote : SpendToken votingPower -> Choice -> IO ()
+vote token choice = spend store token  -- Can't use token again!
+
+-- Lock/unlock for escrow
+lockAsset : SpendToken asset -> IO (LockToken asset)
+unlockAsset : LockToken asset -> IO (SpendToken asset)
+```
+
 ## Architecture
 
 ```
@@ -321,6 +373,9 @@ The Upgradeable Clone for Scalable contracts pattern:
 | State machine | enum + require | `PropTransition from to` |
 | External calls | `(bool, bytes)` + decode | `CallResult a` typed |
 | Gas estimation | runtime / RPC estimate | `GasSeq n` compile-time |
+| CEI pattern | hope + audit | `CEISafe effs` proof |
+| Upgrades | proxy swap, pray | `EpochTransition` typed |
+| Double-spend | trust + mutex | `SpendToken` linear |
 
 **Key insight**: In Solidity, invariants are runtime `require()` checks that can fail.
 In Idris2, invariants are types - violation is a compile error.

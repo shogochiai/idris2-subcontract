@@ -429,6 +429,165 @@ estimateTxGas : (base : Nat) -> (reads : Nat) -> (writes : Nat) -> (calls : Nat)
 
 ---
 
+### Subcontract.Core.Effects
+
+Effect-typed entries with CEI (Checks-Effects-Interactions) safety proofs.
+
+#### Effect Types
+
+```idris
+data Effect : Type where
+  SLoad : SlotId -> Effect          -- Storage read
+  SStore : SlotId -> Effect         -- Storage write
+  Call : TargetId -> Effect         -- External call
+  DelegateCall : TargetId -> Effect
+  StaticCall : TargetId -> Effect
+  Pure : Effect                     -- No effect
+  MemEffect : Effect                -- Memory only
+  Log : Nat -> Effect               -- Event emission
+```
+
+#### CEI Safety Proofs
+
+```idris
+-- Proof that no Write appears before Call
+data CEISafe : EffectList -> Type
+
+-- Proof that no Write follows
+data NoWriteAfter : EffectList -> Type
+
+-- Check at runtime
+checkCEISafe : EffectList -> Maybe (CEISafe effs)
+```
+
+#### Effect-Typed Entry
+
+```idris
+record EffectEntry (effs : EffectList) where
+  constructor MkEffectEntry
+  sig : FnSig
+  handler : IO ()
+
+-- Create entry with CEI proof required
+safeEntry : FnSig -> (effs : EffectList) -> {auto prf : CEISafe effs} -> IO () -> EffectEntry effs
+```
+
+#### Slot Collision Detection
+
+```idris
+slotCollision : EffectList -> EffectList -> Maybe SlotId
+data NoCollision : EffectList -> EffectList -> Type
+```
+
+---
+
+### Subcontract.Core.Epoch
+
+Epoch-indexed state and upgrade safety.
+
+#### Epoch Type
+
+```idris
+data Epoch : Type where
+  Genesis : Epoch
+  Next : Epoch -> Epoch
+
+-- Aliases
+E0 : Epoch  -- Genesis
+E1 : Epoch  -- Next Genesis
+E2 : Epoch  -- Next E1
+```
+
+#### Epoch-Indexed State
+
+```idris
+data EpochState : Epoch -> Type -> Type
+data EpochRef : Epoch -> Type -> Type
+
+epochGet : Storable a => EpochRef e a -> IO (EpochState e a)
+epochSet : Storable a => EpochRef e a -> a -> IO ()
+```
+
+#### Epoch Transitions
+
+```idris
+-- Only sequential upgrades allowed
+data EpochTransition : Epoch -> Epoch -> Type where
+  Upgrade : EpochTransition e (Next e)
+
+-- Migration function type
+Migration : Epoch -> Epoch -> Type -> Type -> Type
+
+-- Perform upgrade
+upgrade : EpochTransition e1 e2 -> Migration e1 e2 a b -> EpochState e1 a -> EpochState e2 b
+```
+
+#### Epoch-Guarded Execution
+
+```idris
+epochGuardedEntry : (expected : Epoch) -> IO () -> IO ()
+upgradeEntry : (from : Epoch) -> (to : Epoch) -> {auto trans : EpochTransition from to} -> IO () -> IO ()
+```
+
+---
+
+### Subcontract.Core.LinearAsset
+
+Linear-persistent assets with double-spend prevention.
+
+#### Asset Identity
+
+```idris
+record AssetId where
+  constructor MkAssetId
+  id : Bits256
+  assetType : Bits256
+```
+
+#### Spend Token (Linear)
+
+```idris
+-- Token that authorizes spending ONCE
+data SpendToken : AssetId -> Type
+
+-- Acquire if unspent and owner matches
+acquireSpendToken : AssetStorage -> AssetId -> Bits256 -> IO (Maybe (SpendToken asset))
+```
+
+#### Core Operations
+
+```idris
+-- Consume token, mark spent
+spend : AssetStorage -> SpendToken asset -> IO ()
+
+-- Consume token, transfer ownership
+transfer : AssetStorage -> SpendToken asset -> Bits256 -> IO ()
+
+-- Consume token, burn permanently
+burn : AssetStorage -> SpendToken asset -> IO ()
+```
+
+#### Lock/Unlock (Escrow)
+
+```idris
+data LockToken : AssetId -> Type
+
+lockAsset : AssetStorage -> SpendToken asset -> IO (LockToken asset)
+unlockAsset : AssetStorage -> LockToken asset -> IO (SpendToken asset)
+```
+
+#### Proofs
+
+```idris
+data IsUnspent : AssetId -> Type
+data Owns : Bits256 -> AssetId -> Type
+
+checkUnspent : AssetStorage -> AssetId -> IO (Maybe (IsUnspent asset))
+checkOwns : AssetStorage -> Bits256 -> AssetId -> IO (Maybe (Owns caller asset))
+```
+
+---
+
 ## Standards Modules
 
 ### Subcontract.Standards.ERC7546
