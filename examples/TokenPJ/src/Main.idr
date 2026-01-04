@@ -1,7 +1,15 @@
 ||| TokenPJ Main Entry Point
 |||
-||| Combines all function modules into a single dispatcher.
-||| This is the implementation contract deployed behind ERC-7546 proxy.
+||| NOTE: This is IMPLEMENTATION code, not a standalone executable.
+||| Users interact with a PROXY contract that DELEGATECALLs here.
+|||
+||| Deployment flow:
+|||   1. Deploy this implementation → get implAddr
+|||   2. Deploy Dictionary, register implAddr for each selector
+|||   3. Deploy Proxy pointing to Dictionary
+|||   4. Users send tx to PROXY address (not this contract)
+|||
+||| See: examples/README.md for architecture diagram
 module Main
 
 import Subcontract.Core.Entry

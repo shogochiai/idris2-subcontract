@@ -1,5 +1,23 @@
 # idris2-subcontract Examples
 
+## ⚠️ Important: How ERC-7546 Works
+
+**Main.idr is NOT the entry point for users!**
+
+```
+User tx → PROXY → Dictionary lookup → DELEGATECALL → Main.idr (impl)
+          ▲                                              │
+          └──────── Storage lives here ◄─────────────────┘
+```
+
+1. **Proxy**: The address users interact with. Holds all storage.
+2. **Dictionary**: Maps function selectors → implementation addresses
+3. **Main.idr**: Implementation code. Runs via DELEGATECALL, writes to Proxy's storage.
+
+When you deploy, users call the **Proxy address**, not the implementation.
+
+---
+
 ## Project Structure
 
 All projects follow the same pattern:

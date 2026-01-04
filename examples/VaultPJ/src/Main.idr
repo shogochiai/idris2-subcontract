@@ -1,4 +1,15 @@
 ||| VaultPJ Main Entry Point
+|||
+||| NOTE: This is IMPLEMENTATION code, not a standalone executable.
+||| Users interact with a PROXY contract that DELEGATECALLs here.
+|||
+||| Deployment flow:
+|||   1. Deploy this implementation → get implAddr
+|||   2. Deploy Dictionary, register implAddr for each selector
+|||   3. Deploy Proxy pointing to Dictionary
+|||   4. Users send tx to PROXY address (not this contract)
+|||
+||| See: examples/README.md for architecture diagram
 module Main
 
 import Subcontract.Core.Entry
