@@ -18,6 +18,10 @@ idris2-subcontract provides:
 - **Access Control as Types**: `HasRole` proofs instead of runtime `require()`
 - **Reentrancy Protection**: Linear-style `Lock` types prevent reentrancy at compile time
 - **State Machine Proofs**: `ValidTransition` ensures only valid state changes compile
+- **Typed Failures**: `Outcome a = Ok a | Fail Conflict Evidence` - no untyped exceptions
+- **Entry Context Policy**: `EntryCtx` restricts operations in receive/fallback/callback
+- **CEI Indexed Monad**: `EvmM Phase` enforces Checks-Effects-Interactions at type level
+- **Saga Pattern**: `Compensable` operations with automatic rollback on failure
 
 ## Installation
 
@@ -68,6 +72,13 @@ Subcontract/
 │   ├── Effects.idr           # Effect-typed entries, CEI safety
 │   ├── Epoch.idr             # Epoch-indexed upgrades
 │   ├── LinearAsset.idr       # Linear-persistent assets
+│   ├── Conflict.idr          # Failure classification (finite sum)
+│   ├── Evidence.idr          # Observable failure data
+│   ├── Outcome.idr           # Result normal form (Ok/Fail)
+│   ├── Resolve.idr           # Recovery procedures, compensation
+│   ├── EntryCtx.idr          # Entry context (receive/fallback/callback)
+│   ├── EvmM.idr              # Indexed monad with CEI phases
+│   ├── Idempotent.idr        # Idempotence, compensable operations
 │   └── ABI/
 │       ├── Sig.idr           # Function signatures
 │       └── Decoder.idr       # Calldata decoding
@@ -311,6 +322,119 @@ lockAsset : SpendToken asset -> IO (LockToken asset)
 unlockAsset : LockToken asset -> IO (SpendToken asset)
 ```
 
+### Typed Failures (Outcome + Conflict)
+
+```idris
+import Subcontract.Core.Outcome
+import Subcontract.Core.Conflict
+import Subcontract.Core.Evidence
+
+-- Every operation returns Outcome - never throws
+transfer : Amount -> IO (Outcome Bool)
+transfer amount = do
+  balance <- getBalance caller
+  if balance < amount
+    then pure $ Fail InsufficientBalance (tagEvidence "transfer")
+    else do
+      updateBalances amount
+      pure $ Ok True
+
+-- Conflict is a FINITE sum - no "unknown" errors
+data Conflict = Revert | Reentrancy | AuthViolation | ...
+
+-- Evidence captures observable data for recovery
+record Evidence where
+  digest : Bits256
+  tags : List String
+  sloadSlots : List Bits256  -- Slots read
+  sstoreSlots : List Bits256 -- Slots written
+```
+
+### Recovery Procedures (Resolve)
+
+```idris
+import Subcontract.Core.Resolve
+
+-- Resolution after failure
+data Resolution a = Recovered a | Escalate | Abort | Retry Nat
+
+-- Conflict-specific resolution
+resolveOutcome : Outcome a -> Resolution a
+resolveOutcome (Ok x) = Recovered x
+resolveOutcome (Fail GasExhausted _) = Retry 3  -- Idempotent: retry
+resolveOutcome (Fail Reentrancy e) = Escalate e -- Security: escalate
+resolveOutcome (Fail c e) = Abort c e           -- Otherwise: abort
+
+-- Saga pattern with automatic rollback
+runSaga : Saga a -> IO (Outcome ())
+```
+
+### Entry Context Policy (EntryCtx)
+
+```idris
+import Subcontract.Core.EntryCtx
+
+-- Track HOW we got here
+data EntryCtx = DirectCall | Receive | Fallback | ERC721Receive | ...
+
+-- Policy restricts what's allowed
+policyOf Receive = minimalPolicy     -- No storage, no calls
+policyOf Fallback = conservativePolicy
+policyOf DirectCall = fullPolicy
+
+-- Guard operations by context
+myReceive : EntryCtx -> IO (Outcome ())
+myReceive ctx = do
+  case checkStorage ctx of  -- Storage forbidden in Receive!
+    Fail c e => pure (Fail c e)
+    Ok () => doStorageOp
+```
+
+### Indexed Monad (EvmM) with CEI Phases
+
+```idris
+import Subcontract.Core.EvmM
+
+-- Phase transitions are TYPE-CHECKED
+data Phase = PreCheck | EffectsDone | ExternalDone | Final
+
+-- EvmM tracks phase at type level
+data EvmM : (pre : Phase) -> (post : Phase) -> Type -> Type
+
+-- require only in PreCheck
+require'' : Bool -> String -> EvmM PreCheck PreCheck ()
+
+-- sstore transitions PreCheck -> EffectsDone
+sstore' : Bits256 -> Bits256 -> EvmM PreCheck EffectsDone ()
+
+-- call transitions EffectsDone -> ExternalDone
+call' : Bits256 -> ... -> EvmM EffectsDone ExternalDone Bool
+
+-- CEI-safe transaction enforced by TYPES
+CEITransaction : Type -> Type
+CEITransaction a = EvmM PreCheck Final a
+```
+
+### Idempotent and Compensable Operations
+
+```idris
+import Subcontract.Core.Idempotent
+
+-- Mark operation as idempotent (safe to retry)
+data IdempotentOp a = MkIdempotent Nat a  -- maxRetry, operation
+
+-- Run with automatic retry on gas exhaustion
+runIdempotent : IdempotentOp (IO (Outcome a)) -> IO (Outcome a)
+
+-- Compensable: has inverse operation
+record Compensable a where
+  forward : IO (Outcome a)
+  inverse : a -> IO (Outcome ())
+
+-- Saga: sequence with automatic rollback
+sequenceWithRollback : List (a ** Compensable a) -> IO (Outcome ())
+```
+
 ## Architecture
 
 ```
@@ -376,6 +500,13 @@ The Upgradeable Clone for Scalable contracts pattern:
 | CEI pattern | hope + audit | `CEISafe effs` proof |
 | Upgrades | proxy swap, pray | `EpochTransition` typed |
 | Double-spend | trust + mutex | `SpendToken` linear |
+| Error handling | try/catch, strings | `Outcome a = Ok a \| Fail Conflict Evidence` |
+| Failure class | string/custom error | `Conflict` finite sum type |
+| Recovery | revert (lose gas) | `Resolution`: Retry/Escalate/Compensate |
+| Entry context | hope receive() is safe | `EntryCtx` policy enforces limits |
+| CEI ordering | audit patterns | `EvmM Phase` indexed monad |
+| Retry safety | manual idempotency | `IdempotentOp` with auto-retry |
+| Rollback | manual undo | `Compensable` with Saga pattern |
 
 **Key insight**: In Solidity, invariants are runtime `require()` checks that can fail.
 In Idris2, invariants are types - violation is a compile error.
@@ -389,6 +520,8 @@ In Idris2, invariants are types - violation is a compile error.
 ## Documentation
 
 - [API Reference](docs/API.md) - Module API documentation
+- [FR Theory Paper](docs/FR_Theory.md) - Formal FR calculus foundations (monadic laws, seven implications)
+- [Failure-Recovery Theory](docs/FR.md) - FR calculus implementation guide
 - [Storage Guide](docs/STORAGE.md) - EVM storage layout guide
 - [Architecture](docs/ARCHITECTURE.md) - Layer design and rationale
 - [Troubleshooting](docs/TROUBLESHOOTING.md) - Common integration issues

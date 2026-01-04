@@ -29,6 +29,15 @@ modules = Subcontract.Standards.ERC7546.Slots
         , Subcontract.Core.Invariants
         , Subcontract.Core.AccessControl
         , Subcontract.Core.Reentrancy
+        , Subcontract.Core.Conflict
+        , Subcontract.Core.Evidence
+        , Subcontract.Core.Outcome
+        , Subcontract.Core.Resolve
+        , Subcontract.Core.EntryCtx
+        , Subcontract.Core.EvmM
+        , Subcontract.Core.Idempotent
+        , Subcontract.Core.FR
+        , Subcontract.Core.Lifecycle
         , Subcontract.Core.Call
         , Subcontract.Core.Gas
         , Subcontract.Core.Effects
