@@ -115,10 +115,19 @@ data GasOp : Nat -> Type where
   ||| Custom gas amount
   Custom : (cost : Nat) -> GasOp cost
 
-||| Get gas cost from operation
+||| Get gas cost from operation (computed from constructor)
 export
 gasCost : GasOp g -> Nat
-gasCost {g} _ = g
+gasCost ColdSLoad = 2100
+gasCost WarmSLoad = 100
+gasCost SStore = 20000
+gasCost SStoreReset = 2900
+gasCost ColdCall = 2600
+gasCost WarmCall = 100
+gasCost ValueCall = 11600
+gasCost MemOp = 3
+gasCost Pure = 0
+gasCost (Custom c) = c
 
 -- =============================================================================
 -- Gas Sequences (Compile-Time Sum)
@@ -135,10 +144,12 @@ data GasSeq : Nat -> Type where
   ||| Sequence two operations (gas adds at type level!)
   Then : GasSeq g1 -> GasSeq g2 -> GasSeq (g1 + g2)
 
-||| Get total gas from sequence
+||| Get total gas from sequence (computed recursively)
 export
 totalGas : GasSeq g -> Nat
-totalGas {g} _ = g
+totalGas Done = 0
+totalGas (Op op) = gasCost op
+totalGas (Then s1 s2) = totalGas s1 + totalGas s2
 
 -- =============================================================================
 -- Gas-Bounded Operations
@@ -182,14 +193,13 @@ export
 gasFunc : GasSeq g -> IO a -> GasFunction g a
 gasFunc seq io = MkGasFunction io seq
 
-||| Sequence two gas functions (gas adds at type level)
+||| Sequence two gas functions with explicit second gas proof
 export
-(>>=>) : GasFunction g1 a -> (a -> GasFunction g2 b) -> GasFunction (g1 + g2) b
-(>>=>) gf1 f = MkGasFunction
+andThen : GasFunction g1 a -> GasSeq g2 -> (a -> IO b) -> GasFunction (g1 + g2) b
+andThen gf1 seq2 f = MkGasFunction
   (do x <- gf1.compute
-      let gf2 = f x
-      gf2.compute)
-  (Then gf1.gasProof (f (believe_me ()).gasProof))
+      f x)
+  (Then gf1.gasProof seq2)
 
 -- =============================================================================
 -- Common Gas Patterns
@@ -262,11 +272,12 @@ ComplexTx = 500000
 
 ||| A transaction with bounded gas.
 ||| The type guarantees the transaction fits within the limit.
+||| The cost parameter is the type-level gas cost.
 public export
-record BoundedTx (limit : Nat) where
+record BoundedTx (limit : Nat) (cost : Nat) where
   constructor MkBoundedTx
-  gasUsed : Nat
-  fitsProof : GasFits limit gasUsed
+  fitsProof : GasFits limit cost
+  gasSeq : GasSeq cost
   computation : IO ()
 
 ||| Create a bounded transaction (requires proof)
@@ -275,8 +286,13 @@ boundedTx : (limit : Nat)
          -> (comp : IO ())
          -> (gasSeq : GasSeq cost)
          -> {auto prf : LTE cost limit}
-         -> BoundedTx limit
-boundedTx limit comp seq {prf} = MkBoundedTx (totalGas seq) (MkGasFits prf) comp
+         -> BoundedTx limit cost
+boundedTx limit comp seq {prf} = MkBoundedTx (MkGasFits prf) seq comp
+
+||| Get the gas cost from a bounded transaction
+export
+txGasCost : BoundedTx limit cost -> Nat
+txGasCost tx = totalGas tx.gasSeq
 
 -- =============================================================================
 -- Gas Estimation Helpers

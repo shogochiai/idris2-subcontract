@@ -395,13 +395,15 @@ checkGasFits : (limit : Nat) -> (cost : Nat) -> Maybe (GasFits limit cost)
 #### Bounded Transactions
 
 ```idris
-record BoundedTx (limit : Nat) where
+-- Cost is type-level, limit is verified at compile time
+record BoundedTx (limit : Nat) (cost : Nat) where
   constructor MkBoundedTx
-  gasUsed : Nat
-  proof : GasFits limit gasUsed
+  fitsProof : GasFits limit cost
+  gasSeq : GasSeq cost
   computation : IO ()
 
-boundedTx : (limit : Nat) -> IO () -> GasSeq cost -> {auto prf : LTE cost limit} -> BoundedTx limit
+boundedTx : (limit : Nat) -> IO () -> GasSeq cost -> {auto prf : LTE cost limit} -> BoundedTx limit cost
+txGasCost : BoundedTx limit cost -> Nat
 ```
 
 #### Common Patterns
