@@ -5,6 +5,8 @@ import EVM.Primitives
 import Subcontract.Core.Entry
 import Subcontract.Core.ABI.Sig
 import Subcontract.Core.ABI.Decoder
+import Subcontract.Core.Outcome
+import Subcontract.Core.FR
 import Main.Storages.Schema
 
 -- =============================================================================
@@ -61,34 +63,33 @@ getCountSel = MkSel 0xa87d942c
 -- Implementation
 -- =============================================================================
 
-increment : IO Integer
+increment : IO (Outcome Integer)
 increment = do
   old <- getCount
   let new = old + 1
   setCount new
   emitCountChanged old new
-  pure new
+  pure (Ok new)
 
-decrement : IO Integer
+decrement : IO (Outcome Integer)
 decrement = do
   old <- getCount
   if old == 0
-    then do
-      evmRevert 0 0
-      pure 0
+    then pure (Fail ArithmeticError (tagEvidence "decrement: underflow"))
     else do
       let new = old - 1
       setCount new
       emitCountChanged old new
-      pure new
+      pure (Ok new)
 
-add : Integer -> IO Integer
+add : Integer -> IO (Outcome Integer)
 add amount = do
   old <- getCount
   let new = old + amount
+  -- Could add overflow check: if new < old then Fail ArithmeticError ...
   setCount new
   emitCountChanged old new
-  pure new
+  pure (Ok new)
 
 -- =============================================================================
 -- Entry Points
@@ -96,22 +97,19 @@ add amount = do
 
 export
 incrementEntry : Entry incrementSig
-incrementEntry = MkEntry incrementSel $ do
-  result <- increment
-  returnUint result
+incrementEntry = MkEntry incrementSel $
+  runFRReturn increment
 
 export
 decrementEntry : Entry decrementSig
-decrementEntry = MkEntry decrementSel $ do
-  result <- decrement
-  returnUint result
+decrementEntry = MkEntry decrementSel $
+  runFRReturn decrement
 
 export
 addEntry : Entry addSig
 addEntry = MkEntry addSel $ do
   amount <- runDecoder decodeUint256
-  result <- add (uint256Value amount)
-  returnUint result
+  runFRReturn (add (uint256Value amount))
 
 export
 getCountEntry : Entry getCountSig
