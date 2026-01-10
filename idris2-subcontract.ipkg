@@ -15,6 +15,8 @@ modules = Subcontract.Standards.ERC7546.Slots
         , Subcontract.Standards.ERC7546.Forward
         , Subcontract.Standards.ERC7546.Proxy
         , Subcontract.Standards.ERC7546.Dictionary
+        , Subcontract.Standards.ERC7546.Analysis
+        , Subcontract.Standards.ERC7546.UpgradeDetection
         , Subcontract.Core.Proxy
         , Subcontract.Core.Dictionary
         , Subcontract.Core.Entry
