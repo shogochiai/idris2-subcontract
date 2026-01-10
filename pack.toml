@@ -5,3 +5,8 @@
 type   = "local"
 path   = "/Users/bob/code/idris2-yul"
 ipkg   = "idris2-yul.ipkg"
+
+[custom.all.idris2-subcontract]
+type   = "local"
+path   = "."
+ipkg   = "idris2-subcontract.ipkg"

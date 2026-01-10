@@ -48,3 +48,7 @@ modules = Subcontract.Standards.ERC7546.Slots
         , Subcontract.Std.Functions.FeatureToggle
         , Subcontract.Std.Functions.Clone
         , Subcontract.Std.Functions.Receive
+        , Subcontract.Standards.ERC7546.Admin.Slots
+        , Subcontract.Standards.ERC7546.Admin.Schema
+        , Subcontract.Standards.ERC7546.Admin.OU
+        , Subcontract.Std.Functions.ProxyFactory
