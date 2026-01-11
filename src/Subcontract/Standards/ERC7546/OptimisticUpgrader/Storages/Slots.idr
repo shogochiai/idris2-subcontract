@@ -1,7 +1,7 @@
 ||| OptimisticUpgrader Storage Slots
 |||
 ||| Storage slot constants for OU multisig admin contract.
-module Subcontract.Standards.ERC7546.Admin.Slots
+module Subcontract.Standards.ERC7546.OptimisticUpgrader.Storages.Slots
 
 -- =============================================================================
 -- OU Storage Slots (ERC-7201 namespaced)

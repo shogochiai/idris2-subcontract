@@ -50,7 +50,8 @@ modules = Subcontract.Standards.ERC7546.Slots
         , Subcontract.Std.Functions.FeatureToggle
         , Subcontract.Std.Functions.Clone
         , Subcontract.Std.Functions.Receive
-        , Subcontract.Standards.ERC7546.Admin.Slots
-        , Subcontract.Standards.ERC7546.Admin.Schema
-        , Subcontract.Standards.ERC7546.Admin.OU
+        , Subcontract.Standards.ERC7546.OptimisticUpgrader.Storages.Slots
+        , Subcontract.Standards.ERC7546.OptimisticUpgrader.Storages.Schema
+        , Subcontract.Standards.ERC7546.OptimisticUpgrader.Functions.Core
+        , Subcontract.Standards.ERC7546.OptimisticUpgrader.Tests.AllTests
         , Subcontract.Std.Functions.ProxyFactory

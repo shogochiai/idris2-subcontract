@@ -8,12 +8,12 @@
 ||| 2. Auditors cast votes (approve/reject)
 ||| 3. Proposer submits signature
 ||| 4. When threshold met + proposer sig, auto-execute upgrade
-module Subcontract.Standards.ERC7546.Admin.OU
+module Subcontract.Standards.ERC7546.OptimisticUpgrader.Functions.Core
 
 import public EVM.Primitives
 import EVM.Storage.Namespace
-import Subcontract.Standards.ERC7546.Admin.Slots
-import Subcontract.Standards.ERC7546.Admin.Schema
+import Subcontract.Standards.ERC7546.OptimisticUpgrader.Storages.Slots
+import Subcontract.Standards.ERC7546.OptimisticUpgrader.Storages.Schema
 import Subcontract.Standards.ERC7546.Dictionary
 
 %default covering

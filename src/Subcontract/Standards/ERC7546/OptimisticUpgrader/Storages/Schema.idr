@@ -1,11 +1,11 @@
 ||| OptimisticUpgrader Storage Schema
 |||
 ||| Storage access functions for OU multisig admin contract.
-module Subcontract.Standards.ERC7546.Admin.Schema
+module Subcontract.Standards.ERC7546.OptimisticUpgrader.Storages.Schema
 
 import public EVM.Primitives
 import EVM.Storage.Namespace
-import Subcontract.Standards.ERC7546.Admin.Slots
+import Subcontract.Standards.ERC7546.OptimisticUpgrader.Storages.Slots
 
 %default covering
 
