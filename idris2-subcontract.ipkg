@@ -17,6 +17,7 @@ modules = Subcontract.Standards.ERC7546.Slots
         , Subcontract.Standards.ERC7546.Dictionary
         , Subcontract.Standards.ERC7546.Analysis
         , Subcontract.Standards.ERC7546.UpgradeDetection
+        , Subcontract.Standards.ERC7546.UpgradeValidation
         , Subcontract.Core.Proxy
         , Subcontract.Core.Dictionary
         , Subcontract.Core.Entry
@@ -27,6 +28,8 @@ modules = Subcontract.Standards.ERC7546.Slots
         , Subcontract.Core.StorageCap
         , Subcontract.Core.Storable
         , Subcontract.Core.Schema
+        , Subcontract.Core.SchemaCompat
+        , Subcontract.Core.SchemaCheck
         , Subcontract.Core.Derived
         , Subcontract.Core.Invariants
         , Subcontract.Core.AccessControl
@@ -55,3 +58,10 @@ modules = Subcontract.Standards.ERC7546.Slots
         , Subcontract.Standards.ERC7546.OptimisticUpgrader.Functions.Core
         , Subcontract.Standards.ERC7546.OptimisticUpgrader.Tests.AllTests
         , Subcontract.Std.Functions.ProxyFactory
+        , Subcontract.Standards.ERC7546.Inception.Storages.Slots
+        , Subcontract.Standards.ERC7546.Inception.Storages.Schema
+        , Subcontract.Standards.ERC7546.Inception.Functions.Propose
+        , Subcontract.Standards.ERC7546.Inception.Functions.Fork
+        , Subcontract.Standards.ERC7546.Inception.Functions.Vote
+        , Subcontract.Standards.ERC7546.Inception.Functions.Resolve
+        , Subcontract.Standards.ERC7546.Inception.Tests.AllTests

@@ -297,3 +297,132 @@ readMiddle64 slot = do
 4. **Test with known values** - Verify slot calculations match Solidity
 5. **Consider upgrades** - Use ERC-7201 for proxy-safe storage
 6. **Use StorageCap** - Make storage access explicit in type signatures
+7. **Validate upgrades at compile-time** - Use `checkUpgrade` macro (see below)
+
+## Compile-Time Schema Upgrade Validation
+
+idris2-subcontract provides **compile-time storage collision detection** using Idris2's elaborator reflection. This prevents the most dangerous class of EVM bugs—storage slot collisions during upgrades—before the code even compiles.
+
+### The Problem
+
+When upgrading a proxy contract, changing the storage layout can corrupt existing data:
+
+```solidity
+// V1: Deployed and has user data
+struct TokenV1 {
+    address owner;       // slot 0
+    uint256 totalSupply; // slot 1
+}
+
+// V2: DANGEROUS - reordered fields!
+struct TokenV2 {
+    uint256 totalSupply; // slot 0 - now reads owner's address as a number!
+    address owner;       // slot 1 - now reads totalSupply as an address!
+}
+```
+
+### The Solution: Compile-Time Validation
+
+```idris
+import Subcontract.Core.Schema
+import Subcontract.Core.SchemaCheck
+
+-- V1: Currently deployed
+TokenSchemaV1 : Schema
+TokenSchemaV1 = MkSchema "myapp.token" 0x1234
+  [ Value "owner" TAddress
+  , Value "totalSupply" TUint256
+  ]
+
+-- V2: Proposed upgrade (SAFE - append-only)
+TokenSchemaV2 : Schema
+TokenSchemaV2 = MkSchema "myapp.token" 0x1234
+  [ Value "owner" TAddress
+  , Value "totalSupply" TUint256
+  , Value "paused" TBool         -- NEW field appended at end
+  ]
+
+-- Compile-time validation: fails if unsafe
+%runElab checkUpgrade TokenSchemaV1 TokenSchemaV2
+```
+
+If the upgrade is safe, compilation proceeds. If not, you get a detailed error:
+
+```
+SCHEMA UPGRADE VALIDATION FAILED
+================================
+
+=== STORAGE COLLISION: TYPE_CHANGED ===
+Field: owner
+Old position: slot+0
+New position: slot+0
+Old definition: owner : address
+New definition: owner : uint256
+Reason: Type changed from address to uint256
+
+Schema upgrades must be append-only:
+  - Existing fields cannot be removed
+  - Existing fields cannot be reordered
+  - Field types cannot be changed
+  - New fields must be appended at the end
+```
+
+### Collision Types Detected
+
+| Collision Type | Description |
+|----------------|-------------|
+| `FIELD_REMOVED` | A field from V1 is missing in V2 |
+| `FIELD_REORDERED` | A field exists but at a different slot position |
+| `TYPE_CHANGED` | Same field name, but different type |
+| `NAMESPACE_CHANGED` | ERC-7201 namespace ID changed |
+| `ROOT_SLOT_CHANGED` | Root storage slot changed |
+
+### ERC-7546 Governance Integration
+
+For contracts using OptimisticUpgrader or Inception governance:
+
+```idris
+import Subcontract.Standards.ERC7546.UpgradeValidation
+
+-- Governance-aware validation with actionable error messages
+%runElab validateUpgradeProposal TokenSchemaV1 TokenSchemaV2
+```
+
+Error messages include governance guidance:
+
+```
+ERC-7546 UPGRADE BLOCKED
+========================
+
+Resolution Options:
+  1. Fix schema to be append-only compatible
+  2. Deploy migration contract to relocate data
+  3. Create new namespace for breaking changes
+
+For OptimisticUpgrader: This proposal should be REJECTED
+For Inception: This violates storage safety boundary
+```
+
+### API Reference
+
+```idris
+-- Core validation (Elab macro)
+checkUpgrade : Schema -> Schema -> Elab ()
+
+-- Alternative syntax
+assertUpgradeSafe : Schema -> Schema -> Elab ()  -- %macro
+
+-- ERC-7546 governance integration
+validateUpgradeProposal : Schema -> Schema -> Elab ()
+
+-- Pure validation (for runtime/testing)
+checkSchemaCompat : Schema -> Schema -> CompatResult
+isCompatible : CompatResult -> Bool
+```
+
+### When to Use
+
+- **Before deploying upgrades** - Add `%runElab checkUpgrade` to your upgrade scripts
+- **In CI/CD pipelines** - Schema mismatches fail compilation automatically
+- **During code review** - Reviewers can trust that storage safety is enforced
+- **With governance** - Use `validateUpgradeProposal` in ERC-7546 workflows
