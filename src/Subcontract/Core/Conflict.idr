@@ -118,6 +118,15 @@ conflictTag ProofMissing = "PROOF_MISSING"
 public export
 data Severity = Critical | High | Medium | Low | Info
 
+public export
+Eq Severity where
+  Critical == Critical = True
+  High == High = True
+  Medium == Medium = True
+  Low == Low = True
+  Info == Info = True
+  _ == _ = False
+
 ||| Get severity of a conflict
 public export
 severity : Conflict -> Severity
@@ -154,6 +163,15 @@ data ConflictCategory
   | ResourceConflict      -- Asset, Storage
   | ExecutionConflict     -- Gas, Decode, Arithmetic
   | PolicyConflict        -- EntryContext, ExternalCall
+
+public export
+Eq ConflictCategory where
+  SecurityConflict == SecurityConflict = True
+  StateConflict == StateConflict = True
+  ResourceConflict == ResourceConflict = True
+  ExecutionConflict == ExecutionConflict = True
+  PolicyConflict == PolicyConflict = True
+  _ == _ = False
 
 ||| Categorize a conflict
 public export
